@@ -3,8 +3,13 @@ package com.lion.browser;
 import android.app.Activity;
 import android.os.Bundle;
 import android.graphics.Color;
+import android.net.Uri;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -12,184 +17,174 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.content.Intent;
 
 import java.util.ArrayList;
 
 public class MainActivity extends Activity {
 
-    private FrameLayout browserArea;
-    private EditText addressBar;
-    private TextView tabCount;
+    private FrameLayout pages;
+    private EditText address;
+    private TextView tabsButton;
 
     private final ArrayList<WebView> tabs = new ArrayList<>();
-    private int currentTab = 0;
+    private int current = 0;
+    private ValueCallback<Uri[]> fileCallback;
 
-    private int dp(int value) {
-        return (int) (value *
-                getResources().getDisplayMetrics().density + 0.5f);
+    private static final int FILE_PICKER = 1001;
+
+    private int dp(int v) {
+        return (int)(v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        buildInterface();
-        newTab("https://www.google.com");
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        buildUI();
+        addTab("https://www.google.com");
     }
 
     private TextView button(String text) {
-        TextView button = new TextView(this);
-        button.setText(text);
-        button.setTextColor(Color.WHITE);
-        button.setTextSize(20);
-        button.setGravity(Gravity.CENTER);
-        button.setClickable(true);
-        return button;
+        TextView v = new TextView(this);
+        v.setText(text);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(19);
+        v.setGravity(Gravity.CENTER);
+        v.setClickable(true);
+        return v;
     }
 
-    private void buildInterface() {
+    private void buildUI() {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(16,17,20));
+        root.setBackgroundColor(Color.rgb(12,13,16));
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(8), dp(6), dp(8), dp(6));
+        top.setPadding(dp(8), dp(7), dp(8), dp(7));
 
-        TextView logo = button("L");
-        logo.setTextSize(22);
-        logo.setBackgroundColor(Color.rgb(139,92,246));
+        TextView lion = button("L");
+        lion.setTextSize(21);
+        lion.setBackgroundColor(Color.rgb(139,92,246));
 
-        top.addView(
-                logo,
-                new LinearLayout.LayoutParams(dp(42), dp(42))
-        );
+        top.addView(lion,
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        addressBar = new EditText(this);
-        addressBar.setSingleLine(true);
-        addressBar.setTextColor(Color.WHITE);
-        addressBar.setHintTextColor(Color.GRAY);
-        addressBar.setHint("بحث أو أدخل عنوان موقع");
-        addressBar.setTextSize(15);
-        addressBar.setPadding(dp(12), 0, dp(12), 0);
-        addressBar.setBackgroundColor(Color.rgb(31,32,37));
+        address = new EditText(this);
+        address.setSingleLine(true);
+        address.setTextSize(15);
+        address.setTextColor(Color.WHITE);
+        address.setHintTextColor(Color.rgb(160,160,165));
+        address.setHint("بحث أو إدخال عنوان");
+        address.setPadding(dp(14), 0, dp(14), 0);
+        address.setBackgroundColor(Color.rgb(30,31,37));
 
-        LinearLayout.LayoutParams addressParams =
+        LinearLayout.LayoutParams ap =
                 new LinearLayout.LayoutParams(0, dp(42), 1);
+        ap.setMargins(dp(8), 0, dp(7), 0);
 
-        addressParams.setMargins(dp(8), 0, dp(6), 0);
-        top.addView(addressBar, addressParams);
+        top.addView(address, ap);
 
-        tabCount = button("1");
-
-        top.addView(
-                tabCount,
-                new LinearLayout.LayoutParams(dp(42), dp(42))
-        );
+        tabsButton = button("1");
+        top.addView(tabsButton,
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
 
         root.addView(top);
 
-        browserArea = new FrameLayout(this);
-        browserArea.setBackgroundColor(Color.WHITE);
+        pages = new FrameLayout(this);
+        pages.setBackgroundColor(Color.WHITE);
 
-        root.addView(
-                browserArea,
+        root.addView(pages,
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         0,
-                        1
-                )
-        );
+                        1));
 
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setGravity(Gravity.CENTER);
-        bottom.setBackgroundColor(Color.rgb(20,21,25));
+        LinearLayout nav = new LinearLayout(this);
+        nav.setGravity(Gravity.CENTER);
+        nav.setBackgroundColor(Color.rgb(18,19,23));
 
         TextView back = button("‹");
         TextView forward = button("›");
-        TextView reload = button("↻");
+        TextView refresh = button("↻");
         TextView home = button("⌂");
         TextView plus = button("+");
 
-        bottom.addView(back,
-                new LinearLayout.LayoutParams(0, dp(52), 1));
+        TextView[] controls = {
+                back, forward, refresh, home, plus
+        };
 
-        bottom.addView(forward,
-                new LinearLayout.LayoutParams(0, dp(52), 1));
+        for (TextView c : controls) {
+            nav.addView(c,
+                    new LinearLayout.LayoutParams(
+                            0, dp(52), 1));
+        }
 
-        bottom.addView(reload,
-                new LinearLayout.LayoutParams(0, dp(52), 1));
+        root.addView(nav);
 
-        bottom.addView(home,
-                new LinearLayout.LayoutParams(0, dp(52), 1));
-
-        bottom.addView(plus,
-                new LinearLayout.LayoutParams(0, dp(52), 1));
-
-        root.addView(bottom);
+        address.setOnEditorActionListener((v, action, event) -> {
+            navigate(address.getText().toString());
+            return true;
+        });
 
         back.setOnClickListener(v -> {
-            WebView web = currentWeb();
-            if (web != null && web.canGoBack()) {
-                web.goBack();
-            }
+            WebView w = currentWeb();
+            if (w != null && w.canGoBack()) w.goBack();
         });
 
         forward.setOnClickListener(v -> {
-            WebView web = currentWeb();
-            if (web != null && web.canGoForward()) {
-                web.goForward();
-            }
+            WebView w = currentWeb();
+            if (w != null && w.canGoForward()) w.goForward();
         });
 
-        reload.setOnClickListener(v -> {
-            WebView web = currentWeb();
-            if (web != null) {
-                web.reload();
-            }
+        refresh.setOnClickListener(v -> {
+            WebView w = currentWeb();
+            if (w != null) w.reload();
         });
 
         home.setOnClickListener(v -> {
-            WebView web = currentWeb();
-            if (web != null) {
-                web.loadUrl("https://www.google.com");
-            }
+            WebView w = currentWeb();
+            if (w != null) w.loadUrl("https://www.google.com");
         });
 
-        plus.setOnClickListener(v -> {
-            newTab("https://www.google.com");
-        });
+        plus.setOnClickListener(v -> addTab("https://www.google.com"));
+
+        tabsButton.setOnClickListener(v -> addTab("https://www.google.com"));
 
         setContentView(root);
     }
 
-    private WebView currentWeb() {
-        if (tabs.isEmpty()) {
-            return null;
-        }
-        return tabs.get(currentTab);
-    }
-
-    private void newTab(String url) {
+    private void addTab(String url) {
 
         WebView web = new WebView(this);
 
-        WebSettings settings = web.getSettings();
+        WebSettings s = web.getSettings();
 
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-        settings.setSupportZoom(false);
-        settings.setUseWideViewPort(true);
-        settings.setLoadWithOverviewMode(false);
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setAllowFileAccess(true);
+        s.setAllowContentAccess(true);
+        s.setJavaScriptCanOpenWindowsAutomatically(true);
+        s.setSupportMultipleWindows(true);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setSupportZoom(false);
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(false);
+        s.setMediaPlaybackRequiresUserGesture(false);
 
         web.setBackgroundColor(Color.WHITE);
 
         web.setWebViewClient(new WebViewClient() {
+
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view,
+                    WebResourceRequest request) {
+                return false;
+            }
 
             @Override
             public void onPageFinished(
@@ -197,99 +192,150 @@ public class MainActivity extends Activity {
                     String url) {
 
                 if (view == currentWeb()) {
-                    addressBar.setText(url);
+                    address.setText(url);
+                    address.setSelection(address.length());
                 }
             }
         });
 
+        web.setWebChromeClient(new WebChromeClient() {
+
+            @Override
+            public boolean onShowFileChooser(
+                    WebView webView,
+                    ValueCallback<Uri[]> callback,
+                    FileChooserParams params) {
+
+                fileCallback = callback;
+
+                Intent intent = params.createIntent();
+
+                try {
+                    startActivityForResult(intent, FILE_PICKER);
+                } catch (Exception e) {
+                    fileCallback = null;
+                    return false;
+                }
+
+                return true;
+            }
+        });
+
         tabs.add(web);
-        currentTab = tabs.size() - 1;
+        current = tabs.size() - 1;
 
-        browserArea.addView(
-                web,
-                new FrameLayout.LayoutParams(-1, -1)
-        );
+        pages.addView(web,
+                new FrameLayout.LayoutParams(-1, -1));
 
-        showCurrentTab();
+        showCurrent();
 
         web.loadUrl(url);
-    }
-
-    private void showCurrentTab() {
-
-        for (int i = 0; i < tabs.size(); i++) {
-            tabs.get(i).setVisibility(
-                    i == currentTab
-                            ? android.view.View.VISIBLE
-                            : android.view.View.GONE
-            );
-        }
-
-        WebView web = currentWeb();
-
-        if (web != null && web.getUrl() != null) {
-            addressBar.setText(web.getUrl());
-        }
-
-        tabCount.setText(
-                String.valueOf(tabs.size())
-        );
     }
 
     private void navigate(String text) {
 
         text = text.trim();
 
-        if (text.isEmpty()) {
-            return;
-        }
+        if (text.length() == 0) return;
 
         String url;
 
         if (text.startsWith("http://") ||
-                text.startsWith("https://")) {
+            text.startsWith("https://")) {
 
             url = text;
 
         } else if (text.contains(".") &&
-                !text.contains(" ")) {
+                   !text.contains(" ")) {
 
             url = "https://" + text;
 
         } else {
 
             url = "https://www.google.com/search?q="
-                    + android.net.Uri.encode(text);
+                    + Uri.encode(text);
         }
 
-        WebView web = currentWeb();
+        WebView w = currentWeb();
 
-        if (web != null) {
-            web.loadUrl(url);
+        if (w != null) w.loadUrl(url);
+    }
+
+    private WebView currentWeb() {
+        if (tabs.isEmpty()) return null;
+        return tabs.get(current);
+    }
+
+    private void showCurrent() {
+
+        for (int i = 0; i < tabs.size(); i++) {
+            tabs.get(i).setVisibility(
+                    i == current
+                            ? View.VISIBLE
+                            : View.GONE);
+        }
+
+        WebView w = currentWeb();
+
+        if (w != null && w.getUrl() != null) {
+            address.setText(w.getUrl());
+        }
+
+        tabsButton.setText(String.valueOf(tabs.size()));
+    }
+
+    @Override
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data) {
+
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data);
+
+        if (requestCode == FILE_PICKER) {
+
+            if (fileCallback == null) return;
+
+            Uri[] result = null;
+
+            if (resultCode == RESULT_OK && data != null) {
+                Uri uri = data.getData();
+
+                if (uri != null) {
+                    result = new Uri[]{uri};
+                }
+            }
+
+            fileCallback.onReceiveValue(result);
+            fileCallback = null;
         }
     }
 
     @Override
     public void onBackPressed() {
 
-        WebView web = currentWeb();
+        WebView w = currentWeb();
 
-        if (web != null && web.canGoBack()) {
-            web.goBack();
+        if (w != null && w.canGoBack()) {
+            w.goBack();
             return;
         }
 
         if (tabs.size() > 1) {
 
-            browserArea.removeView(web);
-            web.destroy();
-            tabs.remove(currentTab);
+            pages.removeView(w);
+            w.destroy();
 
-            if (currentTab >= tabs.size()) {
-                currentTab = tabs.size() - 1;
+            tabs.remove(current);
+
+            if (current >= tabs.size()) {
+                current = tabs.size() - 1;
             }
 
-            showCurrentTab();
+            showCurrent();
             return;
         }
 
@@ -299,8 +345,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
 
-        for (WebView web : tabs) {
-            web.destroy();
+        for (WebView w : tabs) {
+            w.destroy();
         }
 
         tabs.clear();
